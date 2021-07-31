@@ -17,7 +17,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 
-#include "ppool.h"
+#include "ppool_epoll.h"
 
 class cgi_conn
 {

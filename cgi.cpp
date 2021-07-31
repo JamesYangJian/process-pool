@@ -116,10 +116,11 @@ int main(int argc, char *argv[])
     assert(ret != -1);
     ret = listen(listenfd, 5);
     assert(ret != -1);
-    processpool< cgi_conn > *pool = processpool< cgi_conn >::create(listenfd, pnum);
+    processpool *pool = ppool_epoll< cgi_conn >::create(listenfd, pnum);
     if (pool)
     {
         pool->run();
+        printf("Pool finished!\n");
         delete pool;
     }
 
