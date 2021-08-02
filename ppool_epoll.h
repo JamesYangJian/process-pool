@@ -74,8 +74,8 @@ private:
                     }
 
                     sub_process_counter = (i+1)%m_process_number;
-                    send(m_sub_process[i].m_pipefd[0], (char *)&new_conn, sizeof(new_conn), 0);
-                    printf("send new connect request to child:%d\n", i);
+                    ret = send(m_sub_process[i].m_pipefd[0], (char *)&new_conn, sizeof(new_conn), 0);
+                    printf("send new connect request to child:%d, ret:%d\n", i, ret);
                 }
                 else if ((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))
                 {
@@ -196,7 +196,7 @@ private:
                             continue;
                         }
                         addfd(m_epollfd, connfd);
-                        users[connfd].init(m_epollfd, connfd, client_address);
+                        users[connfd].init(connfd, client_address, m_epollfd);
                     }
                 }
                 else if((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))

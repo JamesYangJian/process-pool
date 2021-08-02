@@ -4,7 +4,6 @@ int cgi_conn::m_epollfd = -1;
 
 cgi_conn::cgi_conn()
 {
-
 }
 
 cgi_conn::~cgi_conn()
@@ -12,19 +11,26 @@ cgi_conn::~cgi_conn()
 
 }
 
-void cgi_conn::init(int epollfd, int sockfd, const sockaddr_in& client_addr)
+int cgi_conn::sockfd()
+{
+    return m_sockfd;
+}
+
+void cgi_conn::init(int sockfd, const sockaddr_in& client_addr, int epollfd = -1)
 {
     m_epollfd = epollfd;
     m_sockfd = sockfd;
     m_address = client_addr;
     memset(m_buf, 0, sizeof(m_buf));
     m_read_idx = 0;
+    m_status = STATUS_FREE;
 }
 
 void cgi_conn::process()
 {
     int idx = 0;
     int ret = -1;
+    m_status = STATUS_WORKING;
     while (true)
     {
         idx = m_read_idx;
@@ -34,12 +40,14 @@ void cgi_conn::process()
             if (errno != EAGAIN)
             {
                 removefd(m_epollfd, m_sockfd);
+                m_status = STATUS_CLOSED;
             }
             break;
         }
         else if (ret == 0)
         {
             removefd(m_epollfd, m_sockfd);
+            m_status = STATUS_CLOSED;
             break;
         }
         else
@@ -65,6 +73,7 @@ void cgi_conn::process()
             {
                 printf("filename %s does not exist!\n", m_buf);
                 removefd(m_epollfd, m_sockfd);
+                m_status = STATUS_CLOSED;
                 break;
             }
 
@@ -72,6 +81,7 @@ void cgi_conn::process()
             if (ret == -1)
             {
                 removefd(m_epollfd, m_sockfd);
+                m_status = STATUS_CLOSED;
                 break;
             }
             else if(ret > 0)
@@ -88,6 +98,20 @@ void cgi_conn::process()
             }
         }
     }
+    m_status = STATUS_FREE;
+}
+
+bool cgi_conn::isFree()
+{
+    return (m_status == STATUS_FREE);
+}
+bool cgi_conn::isWorking()
+{
+    return (m_status == STATUS_WORKING);
+}
+bool cgi_conn::isClosed()
+{
+    return (m_status == STATUS_CLOSED);
 }
 
 int main(int argc, char *argv[])
@@ -116,7 +140,11 @@ int main(int argc, char *argv[])
     assert(ret != -1);
     ret = listen(listenfd, 5);
     assert(ret != -1);
+#ifdef EPOLL
     processpool *pool = ppool_epoll< cgi_conn >::create(listenfd, pnum);
+#else
+    processpool *pool = ppool_select< cgi_conn >::create(listenfd, pnum);
+#endif
     if (pool)
     {
         pool->run();
@@ -127,3 +155,4 @@ int main(int argc, char *argv[])
     close(listenfd);
     return 0;
 }
+
