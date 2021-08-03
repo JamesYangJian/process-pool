@@ -196,7 +196,7 @@ private:
                             continue;
                         }
                         addfd(m_epollfd, connfd);
-                        users[connfd].init(connfd, client_address, m_epollfd);
+                        users[connfd].init(connfd, m_epollfd);
                     }
                 }
                 else if((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))

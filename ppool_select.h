@@ -89,8 +89,19 @@ private:
                     }
 
                     sub_process_counter = (i+1)%m_process_number;
-                    iRet = send(m_sub_process[i].m_pipefd[0], (char *)&new_conn, sizeof(new_conn), 0);
-                    printf("send new connect request to child:%d, ret:%d\n", i, iRet);
+                    // iRet = send(m_sub_process[i].m_pipefd[0], (char *)&new_conn, sizeof(new_conn), 0);
+                    struct sockaddr_in client_address;
+                    socklen_t client_addrlength = sizeof(client_address);
+                    int connfd = accept(m_listenfd, (struct sockaddr*)&client_address, &client_addrlength);
+                    if (connfd < 0)
+                    {
+                        printf("accept fail, errno is :%d\n", errno);
+                        continue;
+                    }
+
+                    send_fd(m_sub_process[i].m_pipefd[0], connfd);
+                    printf("send new connect fd to child:%d\n", i, iRet);
+                    close(connfd);
                 }
 
                 if (FD_ISSET(sig_pipefd[0], &m_rdset))
@@ -182,8 +193,12 @@ private:
             iRet = select(m_maxfd+1, &m_rdset, NULL, &m_exceptset, &tv);
             if (iRet < 0)
             {
-                printf("Child select exception, errno=%d!\n", errno);
-                break;
+                if (errno != EINTR)
+                {
+                    printf("Child select exception, errno=%d!\n", errno);
+                    break;
+                }
+                continue;
             }
             else if (iRet == 0)
             {
@@ -235,28 +250,12 @@ private:
                 int pipefd = m_sub_process[m_idx].m_pipefd[1];
                 if (FD_ISSET(pipefd, &m_rdset))
                 {
-                    int client = 0;
-                    iRet = recv(pipefd, (char *)&client, sizeof(client), 0);
-                    if (((iRet < 0) && (errno != EAGAIN)) || iRet == 0)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        struct sockaddr_in client_address;
-                        socklen_t client_addrlength = sizeof(client_address);
-                        int connfd = accept(m_listenfd, (struct sockaddr*)&client_address, &client_addrlength);
-                        if (connfd < 0)
-                        {
-                            printf("accept fail, errno is :%d\n", errno);
-                            continue;
-                        }
-                        T* t = new T();
-                        m_maxfd = M_MAX(m_maxfd, connfd);
-                        t->init(connfd, client_address);
-                        chain_node<T> *pNode = new chain_node<T>(t);
-                        m_user_chain->tail_insert(pNode);
-                    }
+                    int connfd = recv_fd(pipefd);
+                    T* t = new T();
+                    m_maxfd = M_MAX(m_maxfd, connfd);
+                    t->init(connfd);
+                    chain_node<T> *pNode = new chain_node<T>(t);
+                    m_user_chain->tail_insert(pNode);
                 }
 
                 chain_node<T> *node = m_user_chain->head();
@@ -336,11 +335,13 @@ void ppool_select<T>::update_fdset()
             tmpNode = NULL;
             if (node->data()->isFree())
             {
+                printf("node is free, add into select list, fd:%d!\n", node->data()->sockfd());
                 FD_SET(node->data()->sockfd(), &m_rdset);
                 FD_SET(node->data()->sockfd(), &m_exceptset);
             }
             else if (node->data()->isClosed())
             {
+                printf("node closed, remove it from chain, fd:%d!\n", node->data()->sockfd());
                 tmpNode = node;
             }
             node = node->next();

@@ -16,11 +16,10 @@ int cgi_conn::sockfd()
     return m_sockfd;
 }
 
-void cgi_conn::init(int sockfd, const sockaddr_in& client_addr, int epollfd = -1)
+void cgi_conn::init(int sockfd, int epollfd = -1)
 {
     m_epollfd = epollfd;
     m_sockfd = sockfd;
-    m_address = client_addr;
     memset(m_buf, 0, sizeof(m_buf));
     m_read_idx = 0;
     m_status = STATUS_FREE;
@@ -30,7 +29,9 @@ void cgi_conn::process()
 {
     int idx = 0;
     int ret = -1;
+    m_read_idx = 0;
     m_status = STATUS_WORKING;
+    memset(m_buf, 0, sizeof(m_buf));
     while (true)
     {
         idx = m_read_idx;
@@ -39,6 +40,7 @@ void cgi_conn::process()
         {
             if (errno != EAGAIN)
             {
+                printf("Client closed dected, fd:%d\n", m_sockfd);
                 removefd(m_epollfd, m_sockfd);
                 m_status = STATUS_CLOSED;
             }
@@ -46,7 +48,9 @@ void cgi_conn::process()
         }
         else if (ret == 0)
         {
+            printf("Client closed dected 2, fd:%d\n", m_sockfd);
             removefd(m_epollfd, m_sockfd);
+            shutdown(m_sockfd, 0);
             m_status = STATUS_CLOSED;
             break;
         }
@@ -86,19 +90,22 @@ void cgi_conn::process()
             }
             else if(ret > 0)
             {
-                removefd(m_epollfd, m_sockfd);
+                // removefd(m_epollfd, m_sockfd);
+                m_status = STATUS_FREE;
                 break;
             }
             else
             {
                 close(STDOUT_FILENO);
                 dup(m_sockfd);
+                close(m_sockfd);
                 execl(m_buf, m_buf, 0);
+                removefd(m_epollfd, STDOUT_FILENO);
+                printf("cgi_conn exited!\n");
                 exit(0);
             }
         }
     }
-    m_status = STATUS_FREE;
 }
 
 bool cgi_conn::isFree()
@@ -130,11 +137,13 @@ int main(int argc, char *argv[])
     assert(listenfd >= 0);
 
     int ret = 0;
+    int flag = 1;
     struct sockaddr_in address;
     bzero(&address, sizeof(address));
     address.sin_family = AF_INET;
     inet_pton(AF_INET, ip, &address.sin_addr);
     address.sin_port = htons(port);
+    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(int));
 
     ret = bind(listenfd, (struct sockaddr*)&address, sizeof(address));
     assert(ret != -1);

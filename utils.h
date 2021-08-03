@@ -73,7 +73,7 @@ static void send_fd(int fd, int fd_to_send)
 {
     struct iovec iov[1];
     struct msghdr msg;
-    char buf[0];
+    char buf[1];
 
     iov[0].iov_base = buf;
     iov[0].iov_len = 1;

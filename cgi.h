@@ -35,7 +35,7 @@ class cgi_conn
 public:
     cgi_conn();
     ~cgi_conn();
-    void init(int sockfd, const sockaddr_in& client_addr, int epollfd);
+    void init(int sockfd, int epollfd);
     void process();
     int sockfd();
     bool isFree();
@@ -46,10 +46,9 @@ private:
     static const int BUFFER_SIZE = 1024;
     static int m_epollfd;
     int m_sockfd;
-    sockaddr_in m_address;
     char m_buf[BUFFER_SIZE];
     int m_read_idx;
-    CONN_STATUS m_status; 
+    CONN_STATUS m_status;
 };
 
 #endif
