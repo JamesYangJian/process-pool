@@ -40,7 +40,7 @@ void cgi_conn::process()
         {
             if (errno != EAGAIN)
             {
-                printf("Select exception dected, fd:%d\n", m_sockfd);
+                printf("Select exception detected, fd:%d\n", m_sockfd);
                 removefd(m_epollfd, m_sockfd);
                 m_status = STATUS_CLOSED;
             }
@@ -48,7 +48,7 @@ void cgi_conn::process()
         }
         else if (ret == 0)
         {
-            // printf("Client closed dected, fd:%d\n", m_sockfd);
+            // printf("Client closed detected, fd:%d\n", m_sockfd);
             removefd(m_epollfd, m_sockfd);
             shutdown(m_sockfd, 2);
             m_status = STATUS_CLOSED;
