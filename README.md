@@ -17,6 +17,6 @@
 * Do more abstraction 
 
 ## Make and Run
-make clean;make
-./simple-cgi 0.0.0.0 4321 8 //Running on localhost port 4321 with 8 child processes
+* make clean;make
+* ./simple-cgi 0.0.0.0 4321 8 //Running on localhost port 4321 with 8 child processes
 
