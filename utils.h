@@ -28,14 +28,4 @@ void removefd(int epollfd, int fd);
 void send_fd(int fd, int fd_to_send);
 int recv_fd(int fd);
 
-class process
-{
-public:
-    process() : m_pid(-1) {}
-
-    pid_t m_pid;
-    int m_pipefd[2];
-};
-
-
 #endif

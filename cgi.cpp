@@ -40,7 +40,7 @@ void cgi_conn::process()
         {
             if (errno != EAGAIN)
             {
-                printf("Client closed dected, fd:%d\n", m_sockfd);
+                printf("Select exception dected, fd:%d\n", m_sockfd);
                 removefd(m_epollfd, m_sockfd);
                 m_status = STATUS_CLOSED;
             }
@@ -48,16 +48,16 @@ void cgi_conn::process()
         }
         else if (ret == 0)
         {
-            printf("Client closed dected 2, fd:%d\n", m_sockfd);
+            // printf("Client closed dected, fd:%d\n", m_sockfd);
             removefd(m_epollfd, m_sockfd);
-            shutdown(m_sockfd, 0);
+            shutdown(m_sockfd, 2);
             m_status = STATUS_CLOSED;
             break;
         }
         else
         {
             m_read_idx += ret;
-            printf("user input is %s\n", m_buf);
+            // printf("user input is %s\n", m_buf);
             for ( ; idx<m_read_idx; ++idx)
             {
                 if((idx>=1) && (m_buf[idx-1] == '\r') && (m_buf[idx] == '\n'))
@@ -157,7 +157,6 @@ int main(int argc, char *argv[])
     if (pool)
     {
         pool->run();
-        printf("Pool finished!\n");
         delete pool;
     }
 

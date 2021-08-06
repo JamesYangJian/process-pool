@@ -7,6 +7,7 @@ void sig_handler( int sig)
 {
     int save_errno = errno;
     int msg = sig;
+    // printf("sig:%d received!\n", sig);
     send(sig_pipefd[1], (char *)&msg, 1, 0);
 }
 

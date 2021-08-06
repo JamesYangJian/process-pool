@@ -17,6 +17,8 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 
+#define EPOLL
+
 #ifdef EPOLL
 #include "ppool_epoll.h"
 #else

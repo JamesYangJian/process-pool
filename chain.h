@@ -87,6 +87,7 @@ void chain<S>::tail_insert(chain_node<S> *node)
     }
     else
     {
+        node->m_prev = m_tail;
         m_tail->m_next = node;
         m_tail = node;
     }
@@ -104,6 +105,14 @@ void chain<S>::remove(chain_node<S> *node)
     if (m_head == node)
     {
         m_head = node->m_next;
+        if (m_head != NULL)
+        {
+            m_head->m_prev = NULL;
+        }
+        else
+        {
+            m_tail = NULL;
+        }
     }
     else if (m_tail == node)
     {
@@ -133,7 +142,6 @@ void chain<S>::release()
     }
     m_tail = NULL;
     m_count = 0;
-
 }
 
 #endif

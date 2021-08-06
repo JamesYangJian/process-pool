@@ -4,6 +4,7 @@
 
 #include "ppool.h"
 #include "chain.h"
+#include "utils.h"
 
 template< typename T>
 class ppool_select : public processpool
@@ -45,7 +46,6 @@ private:
     {
         struct timeval tv;
         int iRet = -1;
-        int sub_process_counter = 0;
         int new_conn = 1;
 
         setup_sig_pipe();
@@ -56,13 +56,16 @@ private:
             tv.tv_sec = 10;
             tv.tv_usec = 0;
             update_fdset();
-            sub_process_counter = 0;
 
             iRet = select(m_maxfd+1, &m_rdset, NULL, &m_exceptset, &tv);
-            if (iRet < 0)
+            if (iRet < 0 )
             {
-                printf("Parent select exception!\n");
-                break;
+                if (errno != EINTR)
+                {
+                    printf("Parent select exception!\n");
+                    break;
+                }
+                continue;
             }
             else if (iRet == 0)
             {
@@ -72,30 +75,20 @@ private:
             {
                 if (FD_ISSET(m_listenfd, &m_rdset))
                 {
-                    int i = sub_process_counter;
-                    do
-                    {
-                        if (m_sub_process[i].m_pid != -1)
-                        {
-                            break;
-                        }
-                        i = (i+1)%m_process_number;
-                    } while(i != sub_process_counter);
+                    int i = select_sub_process();
 
-                    if (m_sub_process[i].m_pid == -1)
+                    if (i == -1)
                     {
                         m_stop = true;
                         break;
                     }
 
-                    sub_process_counter = (i+1)%m_process_number;
-                    // iRet = send(m_sub_process[i].m_pipefd[0], (char *)&new_conn, sizeof(new_conn), 0);
                     struct sockaddr_in client_address;
                     socklen_t client_addrlength = sizeof(client_address);
                     int connfd = accept(m_listenfd, (struct sockaddr*)&client_address, &client_addrlength);
                     if (connfd < 0)
                     {
-                        printf("accept fail, errno is :%d\n", errno);
+                        // printf("accept fail, errno is :%d\n", errno);
                         continue;
                     }
 
@@ -122,45 +115,15 @@ private:
                             {
                                 case SIGCHLD:
                                 {
-                                    pid_t pid;
-                                    int stat;
-                                    printf("SIGCHLD received in paraent...\n");
-                                    while ((pid = waitpid(-1, &stat, WNOHANG)) > 0)
-                                    {
-                                        for (int j=0; j<m_process_number; j++)
-                                        {
-                                            if (m_sub_process[j].m_pid == pid)
-                                            {
-                                                printf("Child process %d exit!\n", pid);
-                                                close(m_sub_process[j].m_pipefd[0]);
-                                                m_sub_process[j].m_pid = -1;
-                                            }
-                                        }
-                                    }
-
-                                    m_stop = true;
-                                    for (int j=0; j<m_process_number; j++)
-                                    {
-                                        if (m_sub_process[j].m_pid != -1)
-                                        {
-                                            m_stop = false;
-                                            break;
-                                        }
-                                    }
+                                    bool bHealthy = check_children_health();
+                                    m_stop = !bHealthy; 
                                     break;
                                 }
                                 case SIGTERM:
                                 case SIGINT:
                                 {
                                     printf("Killing all of the children now...\n");
-                                    for (int j=0; j<m_process_number; j++)
-                                    {
-                                        int pid = m_sub_process[i].m_pid;
-                                        if (pid != -1)
-                                        {
-                                            kill(pid, SIGTERM);
-                                        }
-                                    }
+                                    kill_children();
                                     break;
                                 }
                                 default:
@@ -225,7 +188,6 @@ private:
                                 {
                                     pid_t pid;
                                     int stat;
-                                    printf("SIGCHLD received!\n");
                                     while ((pid = waitpid(-1, &stat, WNOHANG)) > 0)
                                     {
                                         continue;
@@ -280,9 +242,7 @@ private:
                     }
                 }
             }
-
         }
-
     }
 
     void update_fdset();
@@ -335,13 +295,13 @@ void ppool_select<T>::update_fdset()
             tmpNode = NULL;
             if (node->data()->isFree())
             {
-                printf("node is free, add into select list, fd:%d!\n", node->data()->sockfd());
+                // printf("node is free, add into select list, fd:%d!\n", node->data()->sockfd());
                 FD_SET(node->data()->sockfd(), &m_rdset);
                 FD_SET(node->data()->sockfd(), &m_exceptset);
             }
             else if (node->data()->isClosed())
             {
-                printf("node closed, remove it from chain, fd:%d!\n", node->data()->sockfd());
+                // printf("node closed, remove it from chain, fd:%d!\n", node->data()->sockfd());
                 tmpNode = node;
             }
             node = node->next();
